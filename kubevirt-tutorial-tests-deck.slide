@@ -1,0 +1,104 @@
+Kubevirt-Tutorial: Testing
+Maintain your Laboratories tested
+15 Jul 2019
+Tags: Testing, K8s, Kubevirt, Laboratories
+
+Juan Manuel Parrilla
+Senior Software Engineer, Red Hat
+jparrill@redhat.com
+https://github.com/RHsyseng/kubevirt-tutorial-testing-deck
+@kerbeross
+
+
+* About me
+
+- Programming enthusiast
+- Redhatter
+- Openshift/Kubernetes Lover
+
+.image img/jparrill_avatar.jpg _ 300
+
+.background img/background.png
+.caption [[https://github.com/RHsyseng/kubevirt-tutorial-testing-deck][Kubevirt Laboratory Testing]] by Juan Manuel Parrilla
+
+
+* Agenda
+
+- What is Kubevirt-Tutorial and Why test it?
+- Way of work
+- Literal Programming
+- Extracting the code to be tested
+- Including it on a CI/CD chain
+
+.background img/background.png
+.caption [[https://github.com/RHsyseng/kubevirt-tutorial-testing-deck][Kubevirt Laboratory Testing]] by Juan Manuel Parrilla
+
+
+* What is Kubevirt-Tutorial and Why test it? 
+.background img/background.png
+
+
+* What is Kubevirt-Tutorial and Why test it? 
+
+[[https://github.com/kubevirt/kubevirt-tutorial][Kubevirt-Tutorial]] repository has a serie of laboratories to put your hands on [[https://github.com/kubevirt/kubevirt][Kubevirt]].
+
+- The laboratories was delivered on some conferences like DevConf, OpenSouthCode, ContainerDays.io and we hope to be delivered on some more 
+- In order to trust on that labs when the time comes, we need to maintain tested those labs in a CI/CD way.
+
+*But...there* *is* *no* *code* *there...* *how* *do* *we* *do?*
+
+- Well, that's not true at all, you just need to wrap some sections of your labs and then use a couple of tools to play it properly.  
+
+.background img/background.png
+
+
+* Way of work
+
+Those are the Key pieces of this testing model
+
+- [[https://github.com/bashup/mdsh][MDSH]]: This tool will extract the code from Markdown files.
+- `Make` tool as entrypoint for the Code Building/Testing
+- [[https://github.com/kubevirt/kubevirtci][KubevirtCI]]: This tool will spin up a K8s cluster inside of a container
+- CI/CD Server, in this case [[https://github.com/kubernetes/test-infra/tree/master/prow][Prow]] (Needs `--privilleged` in order to use Nested Virt)
+
+.background img/background.png
+
+
+* Way of work: MDSH
+
+You just need to identify the which code will you want to extract from MD files. To do this, you will add this header, including the lang that you will parse:
+
+	```bash @mdsh
+	mdsh-lang-bash() { shell; }
+	```
+
+With this header, you will extract all the code wrapped between quotes that contains the `shell` name. As a sample, [[https://github.com/kubevirt/kubevirt-tutorial/blob/774acdc1335424c7570246b055ed7e3ca72a27b9/labs/lab002/lab002.md][this file]] will produce this output:
+
+	```shell
+	## LAB 002
+	
+	kubectl version
+	kubectl get pv
+	kubectl get all -n prometheus
+	```
+
+using just this command: `mdsh` `--out` `lab002.sh` `-c` `lab002.md`
+
+.background img/background.png
+
+
+* Way of work: Make
+
+This is the usual tool, [[https://github.com/kubevirt/kubevirt-tutorial/blob/774acdc1335424c7570246b055ed7e3ca72a27b9/Makefile][we've used this as entrypoint]] for build and test stages. And also a couple of Bash files:
+
+- *Build*: Will generate the (in this case) the SH files that will be tested
+- *Test*: This script will take care of requirements installation, Spin up of K8s platform and then execution of the labs over it.
+
+*Test* uses another script that executes every lab by separated, following this way we could have more traceability checking every command, output and the time that it takes.
+
+.background img/background.png
+
+
+* Way of work: KubevirtCi
+
+.background img/background.png
