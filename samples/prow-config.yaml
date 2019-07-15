@@ -1,0 +1,136 @@
+plank:
+  job_url_template: 'https://prow.apps.ovirt.org/view/gcs/kubevirt-prow/{{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if .Spec.Refs}}{{if ne .Spec.Refs.Org ""}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/'
+  job_url_prefix: https://prow.apps.ovirt.org/view/gcs/
+  pod_pending_timeout: 60m
+  allow_cancellations: true # AllowCancellations enables aborting presubmit jobs for commits that have been superseded by newer commits in Github pull requests.
+  default_decoration_config:
+    timeout: 2h
+    grace_period: 15s
+    utility_images:
+      clonerefs: "gcr.io/k8s-prow/clonerefs:v20190703-132f32f32"
+      initupload: "gcr.io/k8s-prow/initupload:v20190703-132f32f32"
+      entrypoint: "gcr.io/k8s-prow/entrypoint:v20190703-132f32f32"
+      sidecar: "gcr.io/k8s-prow/sidecar:v20190703-132f32f32"
+    gcs_configuration:
+      bucket: "kubevirt-prow"
+      path_strategy: "explicit"
+    gcs_credentials_secret: "gcs"
+
+deck:
+  spyglass:
+    size_limit: 500000000 # 500MB
+    viewers:
+      "started.json|finished.json":
+      - "metadata"
+      "build-log.txt":
+      - "buildlog"
+      "artifacts/junit.*\\.xml":
+      - "junit"
+      "artifacts/filtered.cov":
+      - "coverage"
+
+sinker:
+  resync_period: 1m
+  max_prowjob_age: 48h
+  max_pod_age: 30m
+
+prowjob_namespace: kubevirt-prow-jobs
+pod_namespace: kubevirt-prow-jobs
+log_level: debug
+
+tide:
+  merge_method:
+    kubevirt/kubevirt: merge
+    kubevirt/project-infra: squash
+    kubevirt/kubevirtci: squash
+    kubevirt/kubevirt.github.io: squash
+    kubevirt/cloud-image-builder: squash
+    kubevirt/kubevirt-tutorial: squash
+    kubevirt/community: squash
+
+  queries:
+  - repos:
+    - kubevirt/project-infra
+    - kubevirt/kubevirtci
+    - kubevirt/kubevirt.github.io
+    - kubevirt/cloud-image-builder
+    - kubevirt/kubevirt-tutorial
+    - kubevirt/community
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - do-not-merge
+    - do-not-merge/hold
+    - do-not-merge/invalid-owners-file
+    - do-not-merge/work-in-progress
+    - needs-rebase
+  - repos:
+    - kubevirt/kubevirt
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - do-not-merge
+    - do-not-merge/hold
+    - do-not-merge/invalid-owners-file
+    - do-not-merge/work-in-progress
+    - do-not-merge/release-note-label-needed
+    - needs-rebase
+  pr_status_base_url: https://prow.apps.ovirt.org/pr
+  context_options:
+    orgs:
+     kubevirt:
+      repos:
+        dashboard:
+          skip-unknown-contexts: true
+          from-branch-protection: true
+
+# we don't enable the branch protector itself yet, but want to
+# let tide know that travis-ci is needed
+branch-protection:
+  orgs:
+    kubevirt:
+      repos:
+        kubevirt:
+          protect: true
+          required_status_checks:
+            contexts:
+            - continuous-integration/travis-ci
+            - coverage/coveralls
+
+push_gateway:
+  endpoint: pushgateway
+
+presets:
+- labels:
+    preset-dind-enabled: "true"
+  env:
+  - name: DOCKER_IN_DOCKER_ENABLED
+    value: "true"
+  volumes:
+  - name: docker-graph
+    emptyDir: {}
+  volumeMounts:
+  - name: docker-graph
+    mountPath: /docker-graph
+- labels:
+    preset-docker-mirror: "true"
+  volumes:
+  - name: docker-config
+    configMap:
+      name: docker-daemon-mirror-config
+  volumeMounts:
+  - name: docker-config
+    mountPath: /etc/default
+    readOnly: true
+- labels:
+    preset-shared-images: "true"
+  volumes:
+  - name: shared-iso
+    hostPath:
+      path: /var/lib/stdci/shared/kubevirt-images/
+      type: DirectoryOrCreate
+  volumeMounts:
+  - name: shared-iso
+    mountPath: /var/lib/stdci/shared/kubevirt-images/

@@ -26,9 +26,11 @@ https://github.com/RHsyseng/kubevirt-tutorial-testing-deck
 
 - What is Kubevirt-Tutorial and Why test it?
 - Way of work
-- Literal Programming
-- Extracting the code to be tested
+- Literal Programming with MDSH
+- Make Tool as a Build/Test entrypoint
+- K8s cluster on a DIND job
 - Including it on a CI/CD chain
+- Final result
 
 .background img/background.png
 .caption [[https://github.com/RHsyseng/kubevirt-tutorial-testing-deck][Kubevirt Laboratory Testing]] by Juan Manuel Parrilla
@@ -64,9 +66,9 @@ Those are the Key pieces of this testing model
 .background img/background.png
 
 
-* Way of work: MDSH
+* Literal Programming with MDSH
 
-You just need to identify the which code will you want to extract from MD files. To do this, you will add this header, including the lang that you will parse:
+You just need to identify the which block of code will you want to extract from MD files. To do this, you will add this header, including the lang that you will parse:
 
 	```bash @mdsh
 	mdsh-lang-bash() { shell; }
@@ -83,22 +85,107 @@ With this header, you will extract all the code wrapped between quotes that cont
 	```
 
 using just this command: `mdsh` `--out` `lab002.sh` `-c` `lab002.md`
+.caption What is [[https://en.wikipedia.org/wiki/Literal_(computer_programming)][Literal Programming]]
 
 .background img/background.png
 
 
-* Way of work: Make
+* Make Tool as a Build/Test entrypoint
 
-This is the usual tool, [[https://github.com/kubevirt/kubevirt-tutorial/blob/774acdc1335424c7570246b055ed7e3ca72a27b9/Makefile][we've used this as entrypoint]] for build and test stages. And also a couple of Bash files:
+This is the usual tool, [[https://github.com/kubevirt/kubevirt-tutorial/blob/774acdc1335424c7570246b055ed7e3ca72a27b9/Makefile][we've used this Makefile as entrypoint]] for build and test stages. And also a couple of Bash files:
 
 - *Build*: Will generate the (in this case) the SH files that will be tested
-- *Test*: This script will take care of requirements installation, Spin up of K8s platform and then execution of the labs over it.
+- *Tests*: This script will take care of requirements installation, Spin up of K8s platform, deploy the laboratory base in order to test the provision and then execution of the labs over it.
 
-*Test* uses another script that executes every lab by separated, following this way we could have more traceability checking every command, output and the time that it takes.
+*Tests* uses another script that executes every lab by separated, following this way we could have more traceability checking every command, output and the time that it takes.
+
+.background img/background.png
+
+
+* K8s cluster on a Prow DIND job
+
+- Using an already existant "TARGET" on KubevirtCI, this will spin up a K8s cluster inside of a container.
+- This is the workflow on local:
+Shell > KubevirtCI container > VM > Control Plane Containers
+
+- This is the workflow on Prow: 
+Job Pod > KubevirtCI container > VM > Control Plane Containers
+
+- To do it, just execute this:
+
+	```
+	TARGET=k8s-multus-1.13.3 && make cluster-up
+	```
+
+After that you will have some helpers on *cluster-up* folder to access the Vagrant VM, using kubectl or ssh to VMs created over Kubevirt
 
 .background img/background.png
 
 
-* Way of work: KubevirtCi
+* Including it on a CI/CD chain using Prow
+The tests workflow:
+
+- Trigger a Job from a PR or a Periodic task
+- Creates a Pod that will be the sandbox.
+- Creates a VM inside the pod that will contain a K8s cluster
+- Deploy the Laboratory Base on the K8s deployed, simulating the same as we do for conferences
+- Execute the labs like every student will do (not all the commands, just the non-blocking ones)
+- Upload the results to GCS and also finish the job as fail if any lab fails or as succeed if all works fine.
+- Just 1 retry allowed per Lab to avoid corner cases.
+.background img/background.png
+
+
+* Including it on a CI/CD chain using Prow
+
+- *Prow* is a bit special managing DIND (Docker-in-Docker) jobs, it will need some extra config Job pod that will create the container and inside the VM 
+- Must be privilleged job
+.code samples/kubevirt-tutorial-periodics.yaml /securityContext:/,/privileged/
+- It needs some extra ram
+.code samples/kubevirt-tutorial-periodics.yaml /resources:/,/memory/
+- Also needs a concrete image to work fine: 
+.code samples/kubevirt-tutorial-periodics.yaml /- image:/,//
+.background img/background.png
+
+
+* Including it on a CI/CD chain using Prow
+- It needs some presets in order to configure this job as a DIND one.
+.code samples/prow-config.yaml /presets:/,/mountPath/
 
 .background img/background.png
+
+
+* Including it on a CI/CD chain using Prow
+- Other important need from this kind of job its the docker config which stores things like MTU and where will be located the /docker-graph folder
+.code samples/prow-config.yaml /- labels:\n    preset-docker-mirror:/,/readOnly/
+.background img/background.png
+
+
+* Final result 
+This is the result, 2 jobs that will be executed following different rules:
+
+- The first one, the tests will be triggered on every PR.
+- The second one, after every 96h (customizable).
+- We will increase the supported versions of K8s adding scenarios to KubevirtCI repo.
+- We store the logs for a week, of every lab and also of the whole test suite.
+
+.image img/GCS_overview.png _ 700
+.background img/background.png
+
+
+* Final result 
+Logs stored by every lab executed which includes ([[https://00e9e64baceafcf2f22843e878ddab4d540effafce89320773-apidata.googleusercontent.com/download/storage/v1/b/comm-prow-storage/o/logs%2Fkubevirt-ci-periodic-test-lab%2F1149593331773214720%2Fartifacts%2Flogs%2Flab003.log?qk=AD5uMEtx7SvQk0J9SsSeXTkNsjOkMPuR09uWSXa7lsnz3J4Gv06YkutErmil2tOmfq7VDtHPES1vdyjmK0M7pwWp84Qd3vRvt_KglPALIOBWjre4CsFaAetVheSd0C6G_bN3W5thul2RFq3XMXAzMDlpgNkQUCx9_MHXrvMKMJw3UdrxyIVFU1P-1FxeXUb2OxcyIQFrj4ak70bF8PCQ0Ou1TvJzvfKjiMDWJgyRziR8CqkV5JZNsyAgPEaSD7PxsqBA2B1nMtM8c7dm8vYqs7GUt_shkGiXVd5JrqvPKgSUhXukQp3apYlJsvhIZthOK_DlUFh2bGC-pkoCSZf1nv8TzR9x-e_emPz7OEX-wpWe9RxqKX6JO4izWo1bvhvtYPuBF4yfLxtgJybKL3nfGnA3S3Hb7p2pLEqWUXSoTr0RSZDs8qYY5riiw8ezaGQR2ufk5mjH3s4ckbBHbmJXCfUGxJY20SFvW-PdCVM70_Op-rkxh64MqYpVm4FLuZfNdUPqKrWA0gO7lAxsf8UYPC1qhCTAHP2wfefDpRnKW-rXJuGvX7d-pB1o4SbpCUk6NfLtqexbpGsLtgYWjh0sx1pSN6sFuFt2OiaR20AmYFd7qqW5s9llMsy8H8X-EVn9yW5qlPjYVwmuMFALMVjM7vcucccV8gQmp1Fyiu29p1bKEFAZ7jX6Ih1iNa8074R-H-9SeQPvcZQ2dqciz2X3nWpaOANwtqkkh9KAG4f1HkW9aMZZONOZN8PQwxuhBIr4OV8TKw4zrIr09V_vePPIftmiTs9NA9pr3apnq_NGFm5FqPOLiWc-LiigeC_2GHKVA5NkZerV1vtDhwq6tPg3OGurRf78zQflEkymsNiZ1UHjbKu2i7FzCMVb1spmBbYO-SRwI_MO8ZiY][Sample]]):
+
+- Input Command, Output response, Real Time spent
+.image img/GCS_lab_logs_overview.png _ 700
+.background img/background.png
+
+
+* Final result 
+And [[https://00e9e64bace463bfa3d54951bc3152040666720dd71f7b12e7-apidata.googleusercontent.com/download/storage/v1/b/comm-prow-storage/o/logs%2Fkubevirt-ci-periodic-test-lab%2F1149593331773214720%2Fbuild-log.txt?qk=AD5uMEuvH80N6wPDxuKUXFNmFsNHeIVjZR7G_nuwlFefZHDqhM-CwCWw3UQOGxlAAXP0dGG6TxPjNVLDoQJvK6bcb9dtfgx_111LvbahYZv5iQEvjdbakUqVtkGkqJOxYVb-QtdNhfmOQtztDIb_etBEd4ZcANGzQL7oDzYAUkYYyd6_aBeWTnCvOriaJNc8uVL04HAV1SeB1Rb3bwL0tBWud_dtEyQAoRq5B3YqIBGPR7rgANDeMvELFwC_S7bAvssWNW3SnSRGG3mXE8g3Er9NgXLGICgeMluHnwFLEVSG9R1tdElV2JRDXwFqACTpX_QOHml9KNwK9HV3jhOS52VD3EdM5fd5XpJiaSEPejadtHlfRFV5IXYGSJMXLGhELxrGmFznxORPYvfbBYdZXVE0kOML3qlOUL2AkFi11knm2wxoZAnUJdAjUaZHl9OWAbjOfVzqKRQ55kLS1X_IoqwooAbcjzBIJhUKoZI9rjlu6Te04QQ3lwMw_PE-L3uQWzYIMN-a4Z7XBhs7Nevg1EC9CL89_fYA2lRTAmxzvReJoiyNd6lLT8fsIdz5p0MC7XTfX4Gmk4mrpI4DVzXeqTgg9iFOARAXqtZwhJQre-axxBEPzGH4YFsRPX-ZGp6hN8YwEDOJhGCgu3rV84Ul2jXuGTsB77Jr7e1nNN0mSOKjLyWM5cusptaApq18--Xhc2cfXUDPfpvDt5Ihw2tpKpH1_dsCw7GtU2rx98QHTk98qoACwMbdPPayQCWvMkAEFy44QeLqmQ6OiG1nCTxPO3TEm4LLHWbyFYGKvxXY-3o0y12EVCxtA1Zmg9Ea6o8hoMi3WtO16g-CcsOb4bXgEuE_jMs36zLVxLRRbHoGHLav5a4Cgu4E3XI][this is part of the output]] on the Job:
+.image img/GCS_build_log.png
+.background img/background.png
+
+
+* Questions? 
+.background img/background.png
+
