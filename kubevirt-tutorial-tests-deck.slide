@@ -10,16 +10,16 @@ https://github.com/RHsyseng/kubevirt-tutorial-testing-deck
 @kerbeross
 
 
-* About me
+#* About me
 
-- Programming enthusiast
-- Redhatter
-- Openshift/Kubernetes Lover
+#- Programming enthusiast
+#- Redhatter
+#- Openshift/Kubernetes Lover
 
-.image img/jparrill_avatar.jpg _ 300
+#.image img/jparrill_avatar.jpg _ 300
 
-.background img/background.png
-.caption [[https://github.com/RHsyseng/kubevirt-tutorial-testing-deck][Kubevirt Laboratory Testing]] by Juan Manuel Parrilla
+#.background img/background.png
+#.caption [[https://github.com/RHsyseng/kubevirt-tutorial-testing-deck][Kubevirt Laboratory Testing]] by Juan Manuel Parrilla
 
 
 * Agenda
