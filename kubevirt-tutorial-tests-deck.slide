@@ -26,7 +26,7 @@ https://github.com/RHsyseng/kubevirt-tutorial-testing-deck
 
 - What is Kubevirt-Tutorial and Why test it?
 - Way of work
-- Literal Programming with MDSH
+- Literate Programming with MDSH
 - Make Tool as a Build/Test entrypoint
 - K8s cluster on a DIND job
 - Including it on a CI/CD chain
@@ -66,7 +66,7 @@ Those are the Key pieces of this testing model
 .background img/background.png
 
 
-* Literal Programming with MDSH
+* Literate Programming with MDSH
 
 You just need to identify the which block of code will you want to extract from MD files. To do this, you will add this header, including the lang that you will parse:
 
@@ -85,7 +85,7 @@ With this header, you will extract all the code wrapped between quotes that cont
 	```
 
 using just this command: `mdsh` `--out` `lab002.sh` `-c` `lab002.md`
-.caption What is [[https://en.wikipedia.org/wiki/Literal_(computer_programming)][Literal Programming]]
+.caption What is [[https://en.wikipedia.org/wiki/Literate_programming][Literate Programming]]
 
 .background img/background.png
 
